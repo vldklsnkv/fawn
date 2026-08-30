@@ -1,0 +1,16 @@
+.DS_Store
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+*.py[cod]
+# A Fawn library is private runtime data and belongs outside this code checkout.
+.obsidian/
+Assets/
+Exports/
+Inbox/
+Library/
+System/
+Templates/
+Fawn.base
+DAILY_PROMPT.md

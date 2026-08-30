@@ -1,59 +1,94 @@
 # Fawn
 
-Fawn — локальная переносимая библиотека ссылок и медиа. Код и личная библиотека намеренно разделены: checkout можно публиковать, а данные остаются в выбранной внешней папке.
+Fawn is a local-first, portable library for saved links, images, personal notes, and transcripts. It turns each saved item into an Obsidian-compatible Markdown note while keeping a disposable SQLite index for fast search.
 
-## Что уже работает
+The code repository and the personal library are intentionally separate. The checkout can remain public and easy to update, while the user's links, comments, media, and transcripts stay in an external folder chosen at runtime.
 
-- добавление ссылок с личным комментарием;
-- Obsidian-заметка на каждую ссылку;
-- локальный SQLite FTS5-индекс, который можно полностью пересоздать;
-- извлечение заголовка, описания и доступной обложки страницы;
-- полнотекстовый поиск по русскому и английскому тексту;
-- открытый JSONL-экспорт поверх Markdown-источника;
-- безопасный Telegram long-polling без сторонних Python API и облачных AI API.
+## Features
 
-Видео постоянно не хранится. Для локальной транскрипции Fawn временно извлекает одну аудиодорожку через `yt-dlp`; после успешной записи транскрипта временный файл можно удалить. В библиотеке остаются URL, транскрипт, таймкоды и описание.
+- Save a URL together with the user's original comment.
+- Create one readable Markdown note per item.
+- Extract page titles, descriptions, and safe raster cover images.
+- Search Russian and English content through a local SQLite FTS5 index.
+- Rebuild the complete index from Markdown at any time.
+- Export the library as portable JSONL.
+- Receive links through a paired Telegram chat without storing the bot token in the repository.
+- Prepare temporary audio from supported videos for local transcription.
 
-## Быстрый старт
+Markdown notes and files in `Assets/` are the source of truth. `System/fawn.sqlite` is only a derived search index and does not need to be backed up.
 
-```sh
-python3 -m fawn --library "~/Documents/Fawn Library" add "https://example.com" --comment "Пример для вишлиста"
-python3 -m fawn --library "~/Documents/Fawn Library" process
-python3 -m fawn --library "~/Documents/Fawn Library" pending
-python3 -m fawn --library "~/Documents/Fawn Library" search "вишлист"
-```
+## Requirements
 
-`--library PATH` имеет приоритет над `FAWN_LIBRARY`. Если не задано ни одно из них, используется `~/Documents/Fawn Library`. Открой выбранную папку как отдельный vault в Obsidian; данные не хранятся в checkout.
+Fawn requires Python 3.9 or newer and has no mandatory third-party Python dependencies. The Telegram token workflow uses macOS Keychain. Video preparation additionally requires `yt-dlp` and `ffmpeg` to be available on the machine.
 
-## Telegram
-
-Токен нельзя отправлять в чат или записывать в `.env`. Сохрани его через скрытый ввод в macOS Keychain:
+Install the CLI from a checkout:
 
 ```sh
-python3 -m fawn --library "~/Documents/Fawn Library" telegram set-token
-python3 -m fawn --library "~/Documents/Fawn Library" telegram pair
-python3 -m fawn --library "~/Documents/Fawn Library" telegram run
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -e .
+fawn --help
 ```
 
-`pair` разрешает доступ только выбранному Telegram-чату. После проверки бот принимает ссылку с подписью или комментарий-ответ на сообщение со ссылкой.
-
-## Видео
+## Quick start
 
 ```sh
-python3 -m fawn --library "~/Documents/Fawn Library" video prepare ITEM_ID
-# Codex транскрибирует полученный файл локально
-python3 -m fawn --library "~/Documents/Fawn Library" enrich ITEM_ID --transcript-file /local/transcript.txt
-python3 -m fawn --library "~/Documents/Fawn Library" video cleanup ITEM_ID
+fawn --library "$HOME/Documents/Fawn Library" add \
+  "https://example.com" --comment "Reference for a future project"
+fawn --library "$HOME/Documents/Fawn Library" process
+fawn --library "$HOME/Documents/Fawn Library" pending
+fawn --library "$HOME/Documents/Fawn Library" search "future project"
 ```
 
-Fawn не обходит DRM, закрытые аккаунты или авторизацию. `cleanup` откажется удалять временное аудио, пока транскрипт не записан в готовую заметку.
+Library location is resolved in this order:
 
-## Перенос
+1. the global `--library PATH` option;
+2. the `FAWN_LIBRARY` environment variable;
+3. `~/Documents/Fawn Library`.
 
-Для переезда скопируй внешнюю папку библиотеки (например, `Inbox/`, `Library/`, `Assets/` и `Fawn.base`). Затем выполни:
+Open that external folder as an Obsidian vault if desired. Runtime data is never expected to live inside the source checkout.
+
+## Telegram inbox
+
+Store the Telegram bot token through hidden input in macOS Keychain rather than an `.env` file:
 
 ```sh
-python3 -m fawn --library "~/Documents/Fawn Library" rebuild
+fawn --library "$HOME/Documents/Fawn Library" telegram set-token
+fawn --library "$HOME/Documents/Fawn Library" telegram pair
+fawn --library "$HOME/Documents/Fawn Library" telegram run
 ```
 
-Файл `System/fawn.sqlite` переносить необязательно. Команда `python3 -m fawn --library "~/Documents/Fawn Library" export` дополнительно создаёт переносимый `Exports/fawn.jsonl`.
+Pairing restricts ingestion to one approved chat. The bot accepts a link with an optional caption, or a comment sent as a reply to the original link message. Network and provider errors are redacted so the token is not exposed in logs.
+
+## Video and transcripts
+
+Fawn does not permanently keep source video. It can extract one temporary audio track for local transcription, then attach the completed transcript to the item's Markdown note:
+
+```sh
+fawn --library "$HOME/Documents/Fawn Library" video prepare ITEM_ID
+# Transcribe the returned file locally.
+fawn --library "$HOME/Documents/Fawn Library" enrich ITEM_ID \
+  --transcript-file /absolute/path/transcript.txt
+fawn --library "$HOME/Documents/Fawn Library" video cleanup ITEM_ID
+```
+
+Fawn does not bypass DRM, private accounts, or authentication. Cleanup refuses to remove temporary audio until a transcript has been written successfully.
+
+## Portability and safety
+
+To move a library, copy its external folder and rebuild the index:
+
+```sh
+fawn --library "$HOME/Documents/Fawn Library" rebuild
+fawn --library "$HOME/Documents/Fawn Library" export
+```
+
+The exporter writes `Exports/fawn.jsonl`. Personal comments are preserved verbatim and remain separate from generated summaries, categories, and tags. Saved pages and transcripts are treated as untrusted content, and private-network URLs are rejected.
+
+## Development
+
+```sh
+python3 -m unittest discover -s tests -v
+```
+
+Fawn is released under the MIT License. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md).

@@ -377,13 +377,18 @@ class StoreTests(unittest.TestCase):
 
         def create_audio(command, **kwargs):
             self.assertIn("--ignore-config", command)
+            self.assertNotIn("--max-downloads", command)
+            self.assertEqual(
+                command[command.index("--format") + 1],
+                "worst[acodec!=none][vcodec!=none]",
+            )
             self.assertEqual(
                 command[command.index("--match-filter") + 1],
                 "duration<=?1800 & !is_live",
             )
             output = Path(command[command.index("--output") + 1].replace("%(ext)s", "m4a"))
             output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_bytes(b"audio")
+            output.write_bytes(b"a" * 1024)
             return CompletedProcess(command, 0, "", "")
 
         run_mock.side_effect = create_audio

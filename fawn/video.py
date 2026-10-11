@@ -8,6 +8,7 @@ from .utils import ensure_public_http_url, platform_for
 
 MAX_DURATION_SECONDS = 30 * 60
 MAX_AUDIO_BYTES = 250 * 1024 * 1024
+MIN_AUDIO_BYTES = 1024
 SUPPORTED_PLATFORMS = {"instagram", "telegram", "threads", "tiktok", "x", "youtube"}
 
 
@@ -37,8 +38,8 @@ def prepare(store: Store, item_id: str) -> Path:
         "yt-dlp",
         "--ignore-config",
         "--no-playlist",
-        "--max-downloads",
-        "1",
+        "--format",
+        "worst[acodec!=none][vcodec!=none]",
         "--match-filter",
         f"duration<=?{MAX_DURATION_SECONDS} & !is_live",
         "--max-filesize",
@@ -79,7 +80,7 @@ def _valid_audio(path: Path, target: Path) -> bool:
         size = resolved.stat().st_size
     except OSError:
         return False
-    return resolved.parent == target and 0 < size <= MAX_AUDIO_BYTES
+    return resolved.parent == target and MIN_AUDIO_BYTES <= size <= MAX_AUDIO_BYTES
 
 
 def cleanup(store: Store, item_id: str) -> bool:

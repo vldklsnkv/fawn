@@ -76,6 +76,16 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("export", help="Экспортировать библиотеку в JSONL")
     sub.add_parser("stats", help="Показать статистику")
 
+    space = sub.add_parser("space", help="Изменения для синхронизации с ChatGPT Space")
+    space.add_argument("--state", type=Path, required=True, help="Приватный JSON checkpoint вне репозитория")
+    space_sub = space.add_subparsers(dest="space_command", required=True)
+    scan = space_sub.add_parser("scan", help="Найти новые и изменённые заметки без записи в библиотеку")
+    scan.add_argument("--limit", type=int, default=20)
+    scan.add_argument("--out", type=Path)
+    ack = space_sub.add_parser("ack", help="Подтвердить проверенный перенос по сохранённому плану")
+    ack.add_argument("--plan", type=Path, required=True)
+    ack.add_argument("--receipt", type=Path, required=True)
+
     telegram = sub.add_parser("telegram", help="Настроить или запустить Telegram")
     telegram_sub = telegram.add_subparsers(dest="telegram_command", required=True)
     telegram_sub.add_parser("set-token", help="Сохранить токен в macOS Keychain")
@@ -94,6 +104,27 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> None:
     args = build_parser().parse_args(argv)
     root = resolve_library_root(args.library)
+    if args.command == "space":
+        import json
+        from . import space_sync
+        from .utils import atomic_write
+
+        if args.space_command == "scan":
+            result = space_sync.scan(root, args.state, max(1, args.limit))
+            output = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
+            if args.out:
+                if args.out.resolve().is_relative_to(root) or args.out.resolve() == args.state.resolve():
+                    raise ValueError("Keep sync plans outside the source library and separate from the checkpoint")
+                atomic_write(args.out, output)
+                print(json.dumps({"plan": str(args.out), **{key: result[key] for key in ("total_changes", "remaining", "errors", "missing_source_ids")}}, ensure_ascii=False))
+            else:
+                print(output, end="")
+            if result["errors"]:
+                raise SystemExit(1)
+        else:
+            count = space_sync.acknowledge(root, args.state, args.plan, args.receipt)
+            print(f"Подтверждён перенос материалов: {count}")
+        return
     if args.command == "telegram":
         from . import telegram
 

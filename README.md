@@ -85,6 +85,67 @@ fawn --library "$HOME/Documents/Fawn Library" export
 
 The exporter writes `Exports/fawn.jsonl`. Personal comments are preserved verbatim and remain separate from generated summaries, categories, and tags. Saved pages and transcripts are treated as untrusted content, and private-network URLs are rejected.
 
+## ChatGPT Space synchronization
+
+The `space` commands prepare incremental changes for a local Codex automation
+with the Pages plugin connected. They do not call an undocumented API, store
+credentials, or edit the source vault. The automation uploads media, applies
+guarded Page edits, verifies the saved records, and then acknowledges its plan.
+
+Space dates use compact Russian labels such as `15 окт. 26`. Categories and tags
+use English labels and stable hashtags (`#ai_and_technology`, `#ai_coding`). The
+agent can store `space_sync.classification(record)` as `fawn_classification`
+block metadata to retain the original labels in `original_categories` and
+`original_tags`, together with ISO dates for future filters. Unknown non-English
+labels require translation before publication.
+Duplicate matching also recognizes stable Notion page, YouTube video, Telegram
+post, and Threads post IDs across URL variants. Existing URL checkpoints remain
+compatible; conflicting saved identities require review before publishing.
+
+Keep the private checkpoint, plans, upload receipts, and the Space-specific
+runbook outside this public checkout. The checkpoint maps source fingerprints,
+canonical IDs (including merged duplicates), topic Pages, and confirmed images.
+
+```sh
+fawn --library /path/to/library space --state /private/runtime/state.json scan \
+  --limit 20 --out /private/runtime/plan.json
+# The Pages-connected agent applies and reads back the remote changes.
+fawn --library /path/to/library space --state /private/runtime/state.json ack \
+  --plan /private/runtime/plan.json --receipt /private/runtime/receipt.json
+```
+
+An empty scan does not update the checkpoint or the Page's update date. An
+acknowledgement requires verified records, all image references, and the root's
+counts and date. Changes arriving after a plan was made remain pending for the
+next run. Source removals are reported without deleting cloud records. Retain
+upload-owning Pages: removing them can make their images inaccessible elsewhere.
+
+Local scheduled runs require the computer and desktop app to be running.
+
+### Cloud receiver
+
+`cloud/webhook.ts` provides a separate Supabase Telegram inbox. It verifies the
+webhook secret and paired private chat, persists original updates before
+acknowledging them, and suppresses duplicate deliveries. RLS and revoked client
+grants keep the queue private. The Telegram bot token stays in Keychain; webhook
+responses provide acknowledgements without deploying that token.
+
+`python3 -m fawn.cloud --help` exposes one-time setup, receiver verification,
+webhook status, and cutover commands. Keep its private `--runtime` outside this
+checkout and the original library. Verify the receiver before switching, stop
+the local Telegram service, and retain pending updates during cutover.
+
+A hosted Page controller can process this queue without a Mac. Its persistent
+instructions, baseline catalog, code package, processing ledger, and activation
+gate live in the destination Space. Configure and verify that controller
+separately; deploying the receiver alone does not activate synchronization.
+Confirm the external provider before redirecting personal messages. Keep the
+original catalog in the Space rather than copying it into the queue database.
+Cloud additions do not automatically create local Markdown copies. Inaccessible
+source images or transcripts must remain pending with an explicit reason.
+
+Receiver checks: `deno test cloud/webhook_test.ts`.
+
 ## Development
 
 ```sh
